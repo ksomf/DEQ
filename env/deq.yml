@@ -1,0 +1,16 @@
+name: deq
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r = 3.6 #4.x breaks due to merge changes, and GRanges changes
+  - r-tidyverse
+  - r-biocmanager
+  - r-devtools
+  - r-locfit
+  - bioconductor-genomicranges
+  - bioconductor-Rsamtools
+  - bioconductor-deseq2
+  - bioconductor-edger
+  - bioconductor-genomicfeatures
+  - bioconductor-rsubread

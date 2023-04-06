@@ -7,10 +7,9 @@
 #' @param input.bams vector of treatment input bam files
 #' @param ip.bams vector of treatment IP bam files
 #' @param peak.files vector of peak file names
-#' @param gtf location of a gtf file for annotations
+#' @param gtf location of a gtf file for annotations (in ucsc format)
 #' @param paired.end boolean indicating whether reads were paired end (defaults
 #'   to FALSE)
-#' @param outfi output file name (defaults to deq.results.txt)
 #' @param tool which tools to run (options: any combination of d, e, and q;
 #'   defaults to all: 'deq')
 #' @param compare.gene whether to calculate changes in gene expression for
@@ -23,17 +22,22 @@
 #' @import dplyr 
 #' @import GenomeInfoDb
 #' @import S4Vectors
+#' @import locfit
 #' @export
 #' @include import_peaks.R count_reads.R run_tools.R metdiff_function_copy.R
 #' @examples 
 
-deq <- function(input.bams,ip.bams,treated.input.bams,treated.ip.bams,
-                peak.files,gtf,paired.end=FALSE,outfi='deq_results.txt',
-                tool='deq',compare.gene=TRUE,readlen=100,fraglen=100,nthreads=1){
+deq <- function(input.bams,ip.bams,treated.input.bams,treated.ip.bams,peak.files,gtf,
+                paired.end=FALSE,tool='deq',compare.gene=TRUE,readlen=100,fraglen=100,nthreads=1){
   
   if (length(input.bams) != length(ip.bams) | length(treated.input.bams) != length(treated.ip.bams)){
     stop('number of IP bam files must equal number of input bam files')
   }
+  all.bams <- c(input.bams,ip.bams,treated.input.bams,treated.ip.bams)
+  if (length(all.bams) != length(unique(all.bams))) {
+    stop('bam files much each be unique (no shared input files)')
+  }
+
   n.c <- length(input.bams)
   n.t <- length(treated.input.bams)
   extension <- fraglen-readlen
@@ -48,11 +52,10 @@ deq <- function(input.bams,ip.bams,treated.input.bams,treated.ip.bams,
   annotation.order <- c("utr3","utr5","exon","intron","utr3*","utr5*")
   
   #load peaks and annotate
-  peaks <- import.peaks(peak.files,anno,annotation.order) 
+  peaks <- import.peaks(peak.files,anno,annotation.order)
   
   #count reads
-  all.bams <- c(input.bams,ip.bams,treated.input.bams,treated.ip.bams)
-  peaks <- count.reads(peaks,all.bams,paired.end,extension)
+  peaks <- count.reads(peaks,all.bams,paired.end,extension,nthreads=nthreads)
   peak.counts <- DESeq2::counts(peaks$peak.counts)
   
   #run DESeq2, edgeR, and QNB to predict changes in m6A methylation
@@ -65,7 +68,7 @@ deq <- function(input.bams,ip.bams,treated.input.bams,treated.ip.bams,
   #calculate gene log2 fold change  
   if (compare.gene){
     peaks$gene.counts <- get.gene.counts(c(input.bams,treated.input.bams),
-                                         gtf,paired.end,extension,genenames)
+                                         gtf,paired.end,extension,genenames,nthreads=nthreads)
     peaks$gene.de <- run.deseq2.4l2fc(peaks$gene.counts,meta.data[which(meta.data$IP == "input"),],'gene')
     results$gene.l2fc <- peaks$gene.de[results$main.gene,]$gene.l2fc
     results$gene.p <- peaks$gene.de[results$main.gene,]$gene.p
@@ -75,7 +78,5 @@ deq <- function(input.bams,ip.bams,treated.input.bams,treated.ip.bams,
   
   results$start <- results$start-1
   colnames(peak.counts) <- make.names(paste0(meta.data$Condition,"_",meta.data$IP),unique=TRUE)
-  write.table(peak.counts,gsub('.txt','.counts.txt',outfi),quote = FALSE,sep='\t',row.names = TRUE,col.names=TRUE)
-  write.table(results,outfi,quote = FALSE,sep='\t',row.names = FALSE,col.names=TRUE)
-  return(results)
+  return(list(counts=peak.counts, results=results))
 }

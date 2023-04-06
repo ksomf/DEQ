@@ -1,6 +1,6 @@
-get.gene.counts <- function(bamlist,gtffi,pe,extension,genenames){
+get.gene.counts <- function(bamlist,gtffi,pe,extension,genenames,nthreads=1){
   gene.data <- Rsubread::featureCounts(files = bamlist, GTF.featureType="exon",GTF.attrType="gene_id",
-                                         annot.ext=gtffi, isGTFAnnotationFile=TRUE,isPairedEnd = pe,readExtension3 = extension)
+                                         annot.ext=gtffi, isGTFAnnotationFile=TRUE,isPairedEnd = pe,readExtension3 = extension, nthreads=nthreads)
   gene.counts <- gene.data$counts
   conversion.table <- as.data.frame(genenames)
   row.names(conversion.table) <- make.names(genenames$gene_id,unique=TRUE)
